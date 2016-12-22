@@ -498,6 +498,12 @@ typedef struct {
   double dtlb;
   double itlb;
 
+  double vcache_decoder;
+  double vcache_wordline;
+  double vcache_bitline;
+  double vcache_senseamp;
+  double vcache_tagarray;
+  
   double dcache2_decoder;
   double dcache2_wordline;
   double dcache2_bitline;
@@ -526,6 +532,7 @@ typedef struct {
   double result_power;
   double icache_power;
   double dcache_power;
+  double vcache_power;
   double dcache2_power;
 
   double clock_power;

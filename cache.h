@@ -53,6 +53,7 @@
 #define CACHE_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "host.h"
 #include "misc.h"
@@ -202,6 +203,8 @@ struct cache_t
   /* last block to hit, used to optimize cache hit processing */
   md_addr_t last_tagset;	/* tag of last line accessed */
   struct cache_blk_t *last_blk;	/* cache block last accessed */
+  bool eviction;    /* is there an eviction? */
+
 
   /* data blocks */
   byte_t *data;			/* pointer to data blocks allocation */

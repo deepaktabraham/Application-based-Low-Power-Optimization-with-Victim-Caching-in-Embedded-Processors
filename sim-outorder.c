@@ -166,6 +166,12 @@ static char *cache_dl1_opt;
 /* l1 data cache hit latency (in cycles) */
 static int cache_dl1_lat;
 
+/* victim cache config, i.e., {<config>|none} */
+static char *cache_vc_opt;
+
+/* victim cache hit latency (in cycles) */
+static int cache_vc_lat;
+
 /* l2 data cache config, i.e., {<config>|none} */
 static char *cache_dl2_opt;
 
@@ -236,6 +242,7 @@ counter_t lsq_access=0;
 counter_t regfile_access=0;
 counter_t icache_access=0;
 counter_t dcache_access=0;
+counter_t vcache_access=0;
 counter_t dcache2_access=0;
 counter_t alu_access=0;
 counter_t ialu_access=0;
@@ -416,6 +423,9 @@ static struct cache_t *cache_il2;
 /* level 1 data cache, entry level data cache */
 struct cache_t *cache_dl1;
 
+/* victim cache for dl1 */
+struct cache_t *cache_vc;
+
 /* level 2 data cache */
 struct cache_t *cache_dl2;
 
@@ -473,6 +483,35 @@ dl1_access_fn(enum mem_cmd cmd,		/* access cmd, Read or Write */
 	      tick_t now)		/* time of access */
 {
   unsigned int lat;
+ 
+  if (!cache_vc && (cmd == WriteCleanEvictedBlkToVC))
+  {
+    return 0;  // No victim cache. Clean evicted block does not need to be written
+               // to any lower level of memory. Do nothing and return immediately!
+  }
+
+  if (cache_vc && cache_dl1->eviction)
+	{
+            if (cache_probe(cache_vc, baddr) != 0)  // Hit in victim cache
+			{
+				cache_dl1->misses--;
+                cache_dl1->hits++;
+                lat = cache_access(cache_vc, cmd, baddr, NULL, bsize,
+                	   /* now */now, /* pudata */NULL, /* repl addr */NULL);  // Read from victim cache
+				vcache_access++;
+			    cache_flush_addr(cache_vc, baddr, now);  // Flush the "hit" block 
+				return lat; // Default is zero latency for fully associative victim cache
+            }
+			if ((cmd == Write) || (cmd == WriteCleanEvictedBlkToVC))  // Miss in victim cache 
+			{
+				lat = cache_access(cache_vc, Write, baddr, NULL, bsize,
+                	   /* now */now, /* pudata */NULL, /* repl addr */NULL);  // Add replaced block to victim cache
+                vcache_access++;
+				 
+                 if(cmd == WriteCleanEvictedBlkToVC)  // If the command is to Write a clean evicted block to 
+                    return lat;                       // victim cache, return immedately. Else continue.
+            }
+    }
 
   if (cache_dl2)
     {
@@ -502,6 +541,17 @@ dl1_access_fn(enum mem_cmd cmd,		/* access cmd, Read or Write */
 	  return 0;
 	}
     }
+}
+
+/* victim cache block miss handler function */
+static unsigned int         /* latency of block access */
+vc_access_fn(enum mem_cmd cmd,      /* access cmd, Read or Write */
+              md_addr_t baddr,      /* block address to access */
+              int bsize,        /* size of block to access */
+              struct cache_blk_t *blk,  /* ptr to block in upper level */
+              tick_t now)       /* time of access */
+{
+              return 0;
 }
 
 /* l2 data cache block miss handler function */
@@ -805,6 +855,7 @@ sim_reg_options(struct opt_odb_t *odb)
 "    <repl>   - block replacement strategy, 'l'-LRU, 'f'-FIFO, 'r'-random\n"
 "\n"
 "    Examples:   -cache:dl1 dl1:4096:32:1:l\n"
+"                -cache:vc vc:1:32:4:l\n"
 "                -dtlb dtlb:128:4096:32:r\n"
 	       );
 
@@ -812,6 +863,16 @@ sim_reg_options(struct opt_odb_t *odb)
 	      "l1 data cache hit latency (in cycles)",
 	      &cache_dl1_lat, /* default */1,
 	      /* print */TRUE, /* format */NULL);
+
+  opt_reg_string(odb, "-cache:vc",
+         "victim cache for dl1, i.e., {<config>|none}",
+         &cache_vc_opt, "none", 
+         /* print */TRUE, NULL);
+
+  opt_reg_int(odb, "-cache:vclat",
+          "victim cache hit latency (in cycles)",
+          &cache_vc_lat, /* default */0,
+          /* print */TRUE, /* format */NULL);
 
   opt_reg_string(odb, "-cache:dl2",
 		 "l2 data cache config, i.e., {<config>|none}",
@@ -1057,6 +1118,11 @@ sim_check_options(struct opt_odb_t *odb,        /* options database */
     {
       cache_dl1 = NULL;
 
+      /* the victim cache cannot be defined */
+      if (strcmp(cache_vc_opt, "none"))
+    fatal("the l1 data cache must defined if the victim cache is defined");
+      cache_vc = NULL;
+      
       /* the level 2 D-cache cannot be defined */
       if (strcmp(cache_dl2_opt, "none"))
 	fatal("the l1 data cache must defined if the l2 cache is defined");
@@ -1070,6 +1136,22 @@ sim_check_options(struct opt_odb_t *odb,        /* options database */
       cache_dl1 = cache_create(name, nsets, bsize, /* balloc */FALSE,
 			       /* usize */0, assoc, cache_char2policy(c),
 			       dl1_access_fn, /* hit lat */cache_dl1_lat);
+
+      /* is the victim cache defined? */
+      if (!mystricmp(cache_vc_opt, "none"))
+    cache_vc = NULL;
+      else
+    {
+          if (sscanf(cache_vc_opt, "%[^:]:%d:%d:%d:%c",
+                      name, &nsets, &bsize, &assoc, &c) != 5)
+              fatal("bad victim cache parms: "
+                      "<name>:<nsets>:<bsize>:<assoc>:<repl>");
+          if (nsets != 1)
+              fatal("bad victim cache parms - number of sets should be 1!");
+          cache_vc = cache_create(name, nsets, bsize, /* balloc */FALSE,
+                  /* usize */0, assoc, cache_char2policy(c),
+                  vc_access_fn, /* hit latency */cache_vc_lat);
+    }
 
       /* is the level 2 D-cache defined? */
       if (!mystricmp(cache_dl2_opt, "none"))
@@ -1178,7 +1260,10 @@ sim_check_options(struct opt_odb_t *odb,        /* options database */
 
   if (cache_dl1_lat < 1)
     fatal("l1 data cache latency must be greater than zero");
-
+  
+  if (cache_vc_lat < 0)
+    fatal("victim cache latency must be greater than or equal to zero");
+  
   if (cache_dl2_lat < 1)
     fatal("l2 data cache latency must be greater than zero");
 
@@ -1359,6 +1444,8 @@ sim_reg_stats(struct stat_sdb_t *sdb)   /* stats database */
     cache_reg_stats(cache_il2, sdb);
   if (cache_dl1)
     cache_reg_stats(cache_dl1, sdb);
+  if (cache_vc)
+    cache_reg_stats(cache_vc, sdb);
   if (cache_dl2)
     cache_reg_stats(cache_dl2, sdb);
   if (itlb)
@@ -2256,7 +2343,7 @@ ruu_commit(void)
 
               /* commit store value to D-cache */
 		      lat =
-			cache_access(cache_dl1, Write, (LSQ[LSQ_head].addr&~3),
+			dl1_cache_access(cache_dl1, Write, (LSQ[LSQ_head].addr&~3),
 				     NULL, 4, sim_cycle, NULL, NULL);
 		      if (lat > cache_dl1_lat)
 			events |= PEV_CACHEMISS;
@@ -2857,7 +2944,7 @@ ruu_issue(void)
 				  dcache_access++;
 				  /* access the cache if non-faulting */
 				  load_lat =
-				    cache_access(cache_dl1, Read,
+				    dl1_cache_access(cache_dl1, Read,
 						 (rs->addr & ~3), NULL, 4,
 						 sim_cycle, NULL, NULL);
 				  if (load_lat > cache_dl1_lat)
