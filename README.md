@@ -2,17 +2,15 @@
 
 Added the implementation of a victim cache. Have also provided the additions to measure the power and performance metrics of the processor, when a victim cache is used. 
 
-To configure the simulator for portable-ISA: ***make config-pisa***
+To configure the simulator for portable-ISA: ***make config-pisa***<br />
+To build the simulator: ***make***<br />
+To clean the repository: ***make clean***<br />
 
-To build the simulator: ***make***
+Simulation using sim-outorder can be performed with a victim cache by providing the additional command line argument: <br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**`-cache:vc <name>:<nsets>:<bsize>:<assoc>:<repl>`**
 
-To clean the repository: ***make clean***
-
-Simulation using sim-outorder can be performed with a victim cache by providing the additional command line argument:  
-**`-cache:vc <name>:<nsets>:<bsize>:<assoc>:<repl>`**
-
-This victim cache configuration is formatted similar to the general cache configuration format used in SimpleScalar.
-Here, **`<name>`**  is the unique cache name, <br />**`<nsets>`** is the number of sets in the cache (nsets should be 1 for a fully-associative cache), <br />**`<bsize>`** is the block size, <br />**`<assoc>`** is the associativity of the cache (for fully-associative cache, assoc will be the total number of blocks), and <br />**`<repl>`**  is the replacement policy (repl can take the values ‘l’, ‘f’ or ‘r’, where l stands for LRU, f stands for FIFO, and r stands for random replacement). 
+This victim cache configuration is formatted similar to the general cache configuration format used in SimpleScalar.<br />
+Here, &nbsp;&nbsp;**`<name>`**  is the unique cache name, <br />&nbsp;&nbsp;**`<nsets>`** is the number of sets in the cache (nsets should be 1 for a fully-associative cache), <br />&nbsp;&nbsp;**`<bsize>`** is the block size, <br />&nbsp;&nbsp;**`<assoc>`** is the associativity of the cache (for fully-associative cache, assoc will be the total number of blocks), and <br />&nbsp;&nbsp;**`<repl>`**  is the replacement policy (repl can take the values ‘l’, ‘f’ or ‘r’, where l stands for LRU, f stands for FIFO, and r stands for random replacement). 
 
 Example- The additional command line argument to be provided when executing sim-outorder, to create a victim cache with 4 blocks, each of size 32 bytes is “ ***-cache:vc vc:1:32:4:l*** ”. 
 
