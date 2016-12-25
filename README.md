@@ -2,7 +2,7 @@
 
 Added the implementation of a victim cache. Have also provided the additions to measure the power and performance metrics of the processor, when a victim cache is used. The victim cache is implemented as a fully-associative cache, inserted in between the level-1 and the level-2 data caches (or a unified level-2 cache). 
 
-Simulation using sim-outorder can be performed with a victim cache by providing the additional command line argument: 
+Simulation using sim-outorder can be performed with a victim cache by providing the additional command line argument:  
 **`-cache:vc <name>:<nsets>:<bsize>:<assoc>:<repl>`**
 
 This victim cache configuration is formatted similar to the general cache configuration format used in SimpleScalar.
