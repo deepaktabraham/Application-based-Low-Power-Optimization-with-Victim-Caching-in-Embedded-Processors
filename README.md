@@ -1,4 +1,4 @@
-#Application based Low-Power Optimization with Victim Caching in Embedded Processors
+# Application based Low-Power Optimization with Victim Caching in Embedded Processors
 
 Added the implementation of a victim cache. Have also provided the additions to measure the power and performance metrics of the processor, when a victim cache is used. 
 
@@ -7,7 +7,7 @@ Now, the victim cache is searched to find the block that was not found in dl1, w
  
 To calculate the power consumption of the victim cache, counters are initialized based on the victim cache configuration, provided as command-line argument to sim-outorder. Power estimates are then scaled dynamically based on victim cache accesses. <br /><br />
 
-###Steps to build and run the simulator
+### Steps to build and run the simulator
 To configure the simulator for portable-ISA: ***make config-pisa***<br />
 To build the simulator: ***make***<br />
 To clean the repository: ***make clean***<br />
